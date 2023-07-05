@@ -832,10 +832,6 @@ class Downloader:
         logger.info(
             f"\nDemisto instance: Enumerating objects: {number_of_files}, done."
         )
-        logger.info(
-            f"Demisto instance: Receiving objects: 100% ({number_of_files}/{number_of_files}),"
-            f" done.\n"
-        )
 
     def build_system_content(self) -> None:
         """
@@ -863,10 +859,6 @@ class Downloader:
         number_of_files = len(self.custom_content)
         logger.info(
             f"\nDemisto instance: Enumerating objects: {number_of_files}, done."
-        )
-        logger.info(
-            f"Demisto instance: Receiving objects: 100% ({number_of_files}/{number_of_files}),"
-            f" done.\n"
         )
 
     def exist_in_pack_content(self, custom_content_object: dict) -> bool:
