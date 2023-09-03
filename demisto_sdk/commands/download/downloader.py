@@ -95,7 +95,6 @@ KEEP_EXISTING_YAML_FIELDS = [
     "fromversion",
     "toversion",
     "alt_dockerimages",
-    "script.dockerimage45",
     "tests",
     "defaultclassifier",
     "defaultmapperin",
@@ -250,7 +249,7 @@ class Downloader:
 
         if not any((self.input_files, self.download_all_custom_content, self.regex)):
             logger.error("Error: No input parameter has been provided "
-                         "('-i' / '--input', '-r' / '--regex', '-a' / '--all.")
+                         "('-i' / '--input', '-r' / '--regex', '-a' / '--all).")
             return False
 
         if self.download_system_items:
@@ -521,12 +520,13 @@ class Downloader:
         logger.debug(f"'{len(downloaded_playbooks)}' system playbooks were downloaded successfully.")
         return downloaded_playbooks
 
-    def build_file_name(self, content_item: dict, content_item_type: str) -> str:
+    def generate_content_file_name(self, content_item: dict, content_item_type: str) -> str:
         item_name: str = content_item.get("name") or content_item.get("id")
-        return (
-            item_name.replace("/", "_").replace(" ", "_")
-            + ITEM_TYPE_TO_PREFIX[content_item_type]
-        )
+        result = (item_name.replace("/", "_").replace(" ", "_") +
+                  ITEM_TYPE_TO_PREFIX[content_item_type])
+
+        # Remove duplicate underscores
+        return re.sub(r"_{2,}", "_", result)
 
     def fetch_system_content(self) -> dict[str, dict]:
         """
@@ -570,7 +570,8 @@ class Downloader:
         content_objects: dict[str, dict] = {}
 
         for content_item in downloaded_items:
-            file_name = self.build_file_name(content_item=content_item, content_item_type=self.system_item_type)
+            file_name = self.generate_content_file_name(content_item=content_item,
+                                                        content_item_type=self.system_item_type)
             file_data = create_stringio_object(file_data=json.dumps(content_item))
             content_object = self.create_content_item_object(file_name=file_name,
                                                              file_data=file_data,
@@ -679,12 +680,13 @@ class Downloader:
 
         initiator = Initiator(str(root_folder))
         initiator.init()
+        generated_path = Path(initiator.full_output_path)
 
         if not self.keep_empty_folders:
-            self.remove_empty_folders(pack_folder=root_folder)
+            self.remove_empty_folders(pack_folder=generated_path)
 
-        logger.info(f"Pack structure initialized at '{root_folder}'.")
-        return initiator.full_output_path
+        logger.info(f"Pack structure initialized at '{generated_path}'.")
+        return generated_path
 
     def remove_empty_folders(self, pack_folder: Path) -> None:
         """
@@ -827,7 +829,7 @@ class Downloader:
                     "name": content_item_name,
                     "id": content_item_id,
                     "path": file_path,
-                    "file_extension": Path(file_path).suffix,
+                    "file_extension": Path(file_path).suffix.lstrip("."),
                 }
             )
 
@@ -927,7 +929,7 @@ class Downloader:
         Returns:
             dict: The custom content object.
         """
-        file_extension = Path(file_name).suffix
+        file_extension = Path(file_name).suffix.lstrip(".")
 
         if _loaded_data:
             loaded_file_data = _loaded_data
@@ -936,7 +938,7 @@ class Downloader:
             loaded_file_data = get_file_details(file_content=file_data.getvalue(), full_file_path=file_name)
 
             if not loaded_file_data:
-                raise ValueError(f"Unsupported file extension: {file_extension}")
+                raise ValueError(f"Unsupported file extension: '{file_extension}'")
 
         file_type = find_type(path=file_name, _dict=loaded_file_data, file_type=file_extension)
         content_id = get_id(file_content=loaded_file_data)
@@ -1239,7 +1241,7 @@ class Downloader:
             self.update_data(
                 file_path,
                 corresponding_pack_file_path,
-                is_yaml=(content_item_extension == ".yml"))
+                is_yaml=(content_item_extension in ("yml", "yaml")))
 
             content_item_output_path = corresponding_pack_file_path
 
@@ -1256,7 +1258,7 @@ class Downloader:
             logger.warning(f"Failed to remove temp dir '{temp_dir}': {e}")
             logger.debug(traceback.format_exc())
 
-            if self.run_format and content_item_output_path.suffix in (".yml", ".yaml", ".json"):
+            if self.run_format and content_item_output_path.suffix.lstrip(".") in ("yml", "yaml", "json"):
                 format_manager(
                     input=str(content_item_output_path),
                     no_validate=False,
