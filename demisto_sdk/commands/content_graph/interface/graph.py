@@ -70,9 +70,9 @@ class ContentGraphInterface(ABC):
     def _has_infra_graph_been_changed(self) -> bool:
         if not self.content_parser_latest_hash:
             logger.warning("The content parser hash is missing.")
-        # elif self.content_parser_latest_hash != self._get_latest_content_parser_hash():
-        #     logger.warning("The content parser has been changed.")
-        #     return True
+        elif self.content_parser_latest_hash != self._get_latest_content_parser_hash():
+            logger.warning("The content parser has been changed.")
+            return True
         try:
             self.marshal_graph(MarketplaceVersions.XSOAR)
         except Exception as e:

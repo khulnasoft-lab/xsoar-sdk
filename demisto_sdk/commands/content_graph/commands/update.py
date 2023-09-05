@@ -105,7 +105,7 @@ def update_content_graph(
             merge_start_time = time()
             merge_graph_zips(local_zip, storage_zip, target_zip)
             # Attempt to import the merged graph
-            # If the importing the merged graph fails, we import the local repo graph instead
+            # If import of the merged graph fails, we import the local repo graph instead
             if content_graph_interface.import_graph(imported_path=Path(target_zip)):
                 logger.info(f"Successfully merged storage graph with local repo graph, took {int(time() - merge_start_time)}s")
             else:
