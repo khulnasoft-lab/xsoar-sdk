@@ -92,25 +92,25 @@ def update_content_graph(
 
             # We need to export both the local repo graph and the one from storage
             # into 1 zip which we use to import into the current content graph.
-            local_dir_path = Path(local_dir)
 
-            create_content_graph(content_graph_interface, marketplace, dependencies, local_dir_path)
-
-            download_start_time = time()
+            create_content_graph(content_graph_interface, marketplace, dependencies, Path(local_dir))
             logger.info(f"Downloading storage content graph to {storage_dir}...")
             storage_zip = download_content_graph(output_path=Path(storage_dir), marketplace=MarketplaceVersions.XSOAR)
-            download_end_time = time()
+            logger.info(f"Finished downloading the content graph from storage to {storage_zip}")
 
-            logger.info(f"Finished downloading the content graph from storage to {storage_zip}, took {int(download_end_time - download_start_time)}s")
-
-            update_start_time = time()
             target_zip = os.path.join(target_dir, "merged.zip")
-            local_zip = os.path.join(local_dir_path, f"{marketplace}.zip")
+            local_zip = os.path.join(local_dir, f"{marketplace}.zip")
+
             logger.info(f"Merging graph zips {storage_zip} and {local_zip} and saving to '{target_zip}'...")
+            merge_start_time = time()
             merge_graph_zips(local_zip, storage_zip, target_zip)
-            content_graph_interface.import_graph(imported_path=Path(target_zip))
-            update_end_time = time()
-            logger.info(f"Finished merging storage graph with local repo graph, took {int(update_end_time - update_start_time)}s")
+            # Attempt to import the merged graph
+            # If the importing the merged graph fails, we import the local repo graph instead
+            if content_graph_interface.import_graph(imported_path=Path(target_zip)):
+                logger.info(f"Successfully merged storage graph with local repo graph, took {int(time() - merge_start_time)}s")
+            else:
+                logger.info(f"Failed to merge storage graph with local repo graph, took {int(time() - merge_start_time)}s. Falling-back to local graph...")
+                content_graph_interface.import_graph(imported_path=Path(local_dir))
             return
 
     if packs_to_update:
