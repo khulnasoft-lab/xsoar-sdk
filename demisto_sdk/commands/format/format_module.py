@@ -196,8 +196,9 @@ def format_manager(
         if graph:
             update_content_graph(
                 graph,
-                use_git=True,
+                # use_git=True,
                 output_path=graph.output_path,
+                use_current=True
             )
         for file in files:
             file_path = str(Path(file))

@@ -70,19 +70,20 @@ class ContentGraphInterface(ABC):
     def _has_infra_graph_been_changed(self) -> bool:
         if not self.content_parser_latest_hash:
             logger.warning("The content parser hash is missing.")
-        elif self.content_parser_latest_hash != self._get_latest_content_parser_hash():
-            logger.warning("The content parser has been changed.")
-            return True
+        # elif self.content_parser_latest_hash != self._get_latest_content_parser_hash():
+        #     logger.warning("The content parser has been changed.")
+        #     return True
         try:
             self.marshal_graph(MarketplaceVersions.XSOAR)
         except Exception as e:
             logger.warning("Failed to load the content graph.")
-            logger.debug(f"Validation Error: {e}")
+            logger.error(f"Validation Error: {e}")
             return True
 
         return False
 
     def zip_import_dir(self, output_file: Path) -> None:
+        logger.debug(f"Creating a zip in {output_file}...")
         shutil.make_archive(str(output_file), "zip", self.import_path)
 
     @abstractmethod

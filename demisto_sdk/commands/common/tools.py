@@ -29,8 +29,9 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    Union,
+    Union
 )
+import zipfile
 
 import demisto_client
 import git
@@ -2024,6 +2025,22 @@ def download_content_graph(
         requests.get(f"{OFFICIAL_CONTENT_GRAPH_PATH}/{marketplace.value}.zip").content
     )
     return output_path
+
+
+def merge_graph_zips(local_graph_zip: str, remote_file_zip: str, target_zip_file: str):
+    with zipfile.ZipFile(target_zip_file, "w", zipfile.ZIP_DEFLATED) as new_zip:
+        # Extract and add files from the first zip file
+        with zipfile.ZipFile(local_graph_zip, "r") as zip1:
+            for file_info in zip1.infolist():
+                with zip1.open(file_info) as file1:
+                    new_zip.writestr(file_info, file1.read())
+
+        # Extract and add files from the second zip file
+        with zipfile.ZipFile(remote_file_zip, "r") as zip2:
+            for file_info in zip2.infolist():
+                if file_info.filename != "metadata.json":
+                    with zip2.open(file_info) as file2:
+                        new_zip.writestr(file_info, file2.read())
 
 
 def get_latest_upload_flow_commit_hash() -> str:

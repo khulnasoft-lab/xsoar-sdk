@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import List, Optional
+from time import time
 
 import typer
 
@@ -13,7 +14,7 @@ from demisto_sdk.commands.common.logger import (
     logger,
     logging_setup,
 )
-from demisto_sdk.commands.common.tools import download_content_graph
+from demisto_sdk.commands.common.tools import download_content_graph, is_external_repository, merge_graph_zips
 from demisto_sdk.commands.content_graph.commands.common import recover_if_fails
 from demisto_sdk.commands.content_graph.commands.create import (
     create,
@@ -71,7 +72,7 @@ def update_content_graph(
                     content_graph_interface, marketplace, dependencies, output_path
                 )
                 return
-    if not content_graph_interface.import_graph(imported_path):
+    if imported_path and not content_graph_interface.import_graph(imported_path):
         logger.warning("Failed to import the content graph, will create a new graph")
         create_content_graph(
             content_graph_interface, marketplace, dependencies, output_path
@@ -81,9 +82,41 @@ def update_content_graph(
     if use_git and (commit := content_graph_interface.commit):
         packs_to_update.extend(GitUtil().get_all_changed_pack_ids(commit))
 
-    packs_str = "\n".join([f"- {p}" for p in packs_to_update])
-    logger.info(f"Updating the following packs:\n{packs_str}")
-    builder.update_graph(packs_to_update)
+    # If we're running from an external/private repository
+    # we want to merge the graph in storage with the 
+    # private repo graph as some resources in the private repo
+    # might be dependent on core packs or other packs in the marketplace
+    if not imported_path and is_external_repository():
+        logger.info("Running from external repository, need to merge graphs...")
+        with TemporaryDirectory() as storage_dir, TemporaryDirectory() as local_dir, TemporaryDirectory() as target_dir:
+
+            # We need to export both the local repo graph and the one from storage
+            # into 1 zip which we use to import into the current content graph.
+            local_dir_path = Path(local_dir)
+
+            create_content_graph(content_graph_interface, marketplace, dependencies, local_dir_path)
+
+            download_start_time = time()
+            logger.info(f"Downloading storage content graph to {storage_dir}...")
+            storage_zip = download_content_graph(output_path=Path(storage_dir), marketplace=MarketplaceVersions.XSOAR)
+            download_end_time = time()
+
+            logger.info(f"Finished downloading the content graph from storage to {storage_zip}, took {int(download_end_time - download_start_time)}s")
+
+            update_start_time = time()
+            target_zip = os.path.join(target_dir, "merged.zip")
+            local_zip = os.path.join(local_dir_path, f"{marketplace}.zip")
+            logger.info(f"Merging graph zips {storage_zip} and {local_zip} and saving to '{target_zip}'...")
+            merge_graph_zips(local_zip, storage_zip, target_zip)
+            content_graph_interface.import_graph(imported_path=Path(target_zip))
+            update_end_time = time()
+            logger.info(f"Finished merging storage graph with local repo graph, took {int(update_end_time - update_start_time)}s")
+            return
+
+    if packs_to_update:
+        packs_str = "\n".join([f"- {p}" for p in packs_to_update])
+        logger.info(f"Updating the following packs:\n{packs_str}")
+        builder.update_graph(packs_to_update)
 
     if dependencies:
         content_graph_interface.create_pack_dependencies()

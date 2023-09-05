@@ -591,7 +591,6 @@ class Neo4jContentGraphInterface(ContentGraphInterface):
         6. Remove empty properties
 
         Args:
-            external_import_paths (List[Path]): A list of external repositories' import paths.
             imported_path (Path): The path to import the graph from.
 
         Returns:
@@ -615,6 +614,7 @@ class Neo4jContentGraphInterface(ContentGraphInterface):
 
     def export_graph(self, output_path: Optional[Path] = None) -> None:
         self.clean_import_dir()
+        logger.info(f"Exporting graph to '{output_path}'...")
         with self.driver.session() as session:
             session.execute_write(export_graphml, self.repo_path.name)
         self.dump_metadata()
