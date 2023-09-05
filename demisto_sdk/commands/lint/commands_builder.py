@@ -298,6 +298,7 @@ def build_pytest_command(test_xml: str = "", json: bool = False, cov: str = "") 
     if cov:
         command += f" --cov-report= --cov={cov}"
 
+    command += "-Wall"
     return command
 
 
