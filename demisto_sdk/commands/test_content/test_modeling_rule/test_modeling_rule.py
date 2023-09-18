@@ -38,7 +38,7 @@ from demisto_sdk.commands.common.logger import (
 from demisto_sdk.commands.common.tools import (
     get_file,
     is_epoch_datetime,
-    parse_int_or_default,
+    parse_int_or_default, get_pack_name,
 )
 from demisto_sdk.commands.test_content.test_modeling_rule.constants import (
     EXPECTED_SCHEMA_MAPPINGS,
@@ -902,11 +902,11 @@ def validate_modeling_rule(
         )
         test_data = TestData.parse_file(modeling_rule.testdata_path.as_posix())
         if (
-            Validations.TEST_DATA_CONFIG_IGNORE.value
+            Validations.TEST_DATA_CONFIG_IGNORE
             not in test_data.ignored_validations
         ):
             logger.info(
-                "[green]test data config is not ignored starting the test data validation...[/green]",
+                f"[green]starting the test data validation for test data {modeling_rule.testdata_path}...[/green]",
                 extra={"markup": True},
             )
             missing_event_data, _ = is_test_data_exists_on_server(
@@ -926,7 +926,8 @@ def validate_modeling_rule(
                 xsiam_client, retrying_caller, modeling_rule, interactive
             ):
                 test_case = TestCase(
-                    "Pack not installed on tenant", classname="Modeling Rule"
+                    f"Pack {get_pack_name(modeling_rule.testdata_path)} not installed on tenant",
+                    classname="Modeling Rule",
                 )
                 return add_result_to_test_case(
                     "Pack not installed on tenant",
@@ -939,18 +940,19 @@ def validate_modeling_rule(
                 classname=f"Modeling Rule {get_relative_path_to_content(modeling_rule.schema_path)}",
             )
             if schema_path := modeling_rule.schema_path:
-                try:
-                    schema = get_file(modeling_rule.schema_path)
-                except json.JSONDecodeError as ex:
-                    err = f"Failed to parse schema file {get_relative_path_to_content(modeling_rule.schema_path)} as JSON"
-                    logger.error(
-                        f"[red]{err}[/red]",
-                        extra={"markup": True},
-                    )
-                    schema_test_case.system_err = str(ex)
-                    return add_result_to_test_case(
-                        err, schema_test_case, modeling_rule_test_suite
-                    )
+                with open(modeling_rule.schema_path) as schema_file:
+                    try:
+                        schema = json.load(schema_file)
+                    except json.JSONDecodeError as ex:
+                        err = f"Failed to parse schema file {get_relative_path_to_content(modeling_rule.schema_path)} as JSON"
+                        logger.error(
+                            f"[red]{err}[/red]",
+                            extra={"markup": True},
+                        )
+                        schema_test_case.system_err = str(ex)
+                        return add_result_to_test_case(
+                            err, schema_test_case, modeling_rule_test_suite
+                        )
             else:
                 err = f"Schema file does not exist in path {get_relative_path_to_content(modeling_rule.schema_path)}"
                 return log_error_to_test_case(
