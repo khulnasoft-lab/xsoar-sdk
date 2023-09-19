@@ -36,9 +36,9 @@ from demisto_sdk.commands.common.logger import (
     logging_setup,
 )
 from demisto_sdk.commands.common.tools import (
-    get_file,
+    get_pack_name,
     is_epoch_datetime,
-    parse_int_or_default, get_pack_name,
+    parse_int_or_default,
 )
 from demisto_sdk.commands.test_content.test_modeling_rule.constants import (
     EXPECTED_SCHEMA_MAPPINGS,
@@ -901,10 +901,7 @@ def validate_modeling_rule(
             extra={"markup": True},
         )
         test_data = TestData.parse_file(modeling_rule.testdata_path.as_posix())
-        if (
-            Validations.TEST_DATA_CONFIG_IGNORE
-            not in test_data.ignored_validations
-        ):
+        if Validations.TEST_DATA_CONFIG_IGNORE not in test_data.ignored_validations:
             logger.info(
                 f"[green]starting the test data validation for test data {modeling_rule.testdata_path}...[/green]",
                 extra={"markup": True},
