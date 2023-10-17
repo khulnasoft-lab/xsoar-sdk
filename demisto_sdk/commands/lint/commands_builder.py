@@ -288,7 +288,7 @@ def build_pytest_command(test_xml: str = "", json: bool = False, cov: str = "") 
         str: pytest command
     """
     command = (
-        "pytest -Wignore::DeprecationWarning -ra --override-ini='asyncio_mode=auto'"
+        "pytest -W ignore::DeprecationWarning -ra --override-ini='asyncio_mode=auto'"
     )
     # Generating junit-xml report - used in circle ci
     if test_xml:
