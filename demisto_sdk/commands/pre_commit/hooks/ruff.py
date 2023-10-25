@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, Set
 
 from demisto_sdk.commands.common.constants import PreCommitModes
-from demisto_sdk.commands.pre_commit.hooks.hook import Hook, join_files
+from demisto_sdk.commands.pre_commit.hooks.hook import Hook
 
 
 class RuffHook(Hook):
@@ -45,6 +45,9 @@ class RuffHook(Hook):
                 hook["args"].append("--fix")
             if github_actions:
                 hook["args"].append("--format=github")
-            hook["files"] = join_files(python_version_to_files[python_version])
+            hook["args"].extend(
+                str(path) for path in python_version_to_files[python_version]
+            )
+            # hook["files"] = join_files(python_version_to_files[python_version])
 
             self.hooks.append(hook)
