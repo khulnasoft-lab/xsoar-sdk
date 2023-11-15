@@ -6,6 +6,7 @@
 * Added support for xsoar, xsoar-saas and xsiam wrapper clients to ease the integration via their apis.
 * Internal: Added a welcome comment to contributions PRs.
 * Fix metadata dependencies dumping in **prepare-content** command.
+* Fixed an issue in **prepare-content** where tags were added to metadata because of test scripts.
 
 ## 1.22.0
 * Added Docker Hook support to **pre-commit**; for details see https://github.com/demisto/demisto-sdk/blob/master/demisto_sdk/commands/pre_commit/README.md#docker-hooks
