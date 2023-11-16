@@ -8,8 +8,13 @@ from demisto_sdk.commands.common.constants import (
     MarketplaceVersions,
 )
 from demisto_sdk.commands.common.logger import logger
+from demisto_sdk.commands.common.tools import (
+    write_dict,
+)
 from demisto_sdk.commands.content_graph.common import ContentType, RelationshipType
-from demisto_sdk.commands.content_graph.objects.base_content import BaseContent
+from demisto_sdk.commands.content_graph.objects.base_content import (
+    BaseNode,
+)
 from demisto_sdk.commands.content_graph.objects.integration_script import (
     IntegrationScript,
 )
@@ -52,7 +57,7 @@ class Script(IntegrationScript, content_type=ContentType.SCRIPT):  # type: ignor
         return data
 
     @property
-    def imported_by(self) -> List[BaseContent]:
+    def imported_by(self) -> List[BaseNode]:
         return [
             r.content_item_to
             for r in self.relationships_data[RelationshipType.IMPORTS]
@@ -82,8 +87,8 @@ class Script(IntegrationScript, content_type=ContentType.SCRIPT):  # type: ignor
                     }
                 )
             try:
-                with (dir / obj.normalize_name).open("w") as f:
-                    obj.handler.dump(data, f)
+                write_dict(dir / obj.normalize_name, data=data, handler=obj.handler)
+
             except FileNotFoundError as e:
                 logger.warning(f"Failed to dump {obj.path} to {dir}: {e}")
 

@@ -28,6 +28,7 @@ json = JSON_Handler()
 
 class PackMetadata(BaseModel):
     name: str
+    display_name: str
     description: Optional[str]
     created: Optional[str]
     updated: Optional[str] = Field("")
@@ -51,7 +52,7 @@ class PackMetadata(BaseModel):
     use_cases: Optional[List[str]] = Field(alias="useCases")
     keywords: Optional[List[str]]
     search_rank: Optional[int] = Field(alias="searchRank")
-    excluded_dependencies: Optional[List[str]] = Field(alias="excludedDependencies")
+    excluded_dependencies: Optional[List[str]] = Field([], alias="excludedDependencies")
     videos: Optional[List[str]] = Field([])
     modules: Optional[List[str]] = Field([])
     integrations: Optional[List[str]] = Field([])
@@ -198,7 +199,7 @@ class PackMetadata(BaseModel):
                 or "",
             }
             for r in dependencies
-            if r.is_direct
+            if r.is_direct and r.content_item_to.object_id not in self.excluded_dependencies and not r.content_item_to.hidden  # type: ignore
         }
 
     def _get_pack_tags(
@@ -321,8 +322,16 @@ class PackMetadata(BaseModel):
         Returns:
             set: Pack's tags.
         """
-        tags = set()
-        landing_page_sections = get_json(LANDING_PAGE_SECTIONS_PATH)
+        tags: set = set()
+
+        try:
+            landing_page_sections = get_json(LANDING_PAGE_SECTIONS_PATH)
+        except FileNotFoundError as e:
+            logger.warning(
+                f"Couldn't find the landing_page file in path {LANDING_PAGE_SECTIONS_PATH}. Skipping collecting tags by landing page sections.\n{e}"
+            )
+            return tags
+
         sections = landing_page_sections.get("sections") or []
 
         for section in sections:
@@ -346,7 +355,12 @@ class PackMetadata(BaseModel):
 
     @staticmethod
     def _get_author(author, marketplace):
-        if marketplace in [MarketplaceVersions.XSOAR, MarketplaceVersions.XPANSE]:
+        if marketplace in [
+            MarketplaceVersions.XSOAR,
+            MarketplaceVersions.XPANSE,
+            MarketplaceVersions.XSOAR_ON_PREM,
+            MarketplaceVersions.XSOAR_SAAS,
+        ]:
             return author
         elif marketplace == MarketplaceVersions.MarketplaceV2:
             return author.replace("Cortex XSOAR", "Cortex XSIAM")

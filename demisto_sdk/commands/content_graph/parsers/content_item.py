@@ -79,6 +79,7 @@ class ContentItemParser(BaseContentParser, metaclass=ParserMetaclass):
         self,
         path: Path,
         pack_marketplaces: List[MarketplaceVersions] = list(MarketplaceVersions),
+        git_sha: Optional[str] = None,
     ) -> None:
         self.pack_marketplaces: List[MarketplaceVersions] = pack_marketplaces
         super().__init__(path)
@@ -88,6 +89,7 @@ class ContentItemParser(BaseContentParser, metaclass=ParserMetaclass):
     def from_path(
         path: Path,
         pack_marketplaces: List[MarketplaceVersions] = list(MarketplaceVersions),
+        git_sha: Optional[str] = None,
     ) -> "ContentItemParser":
         """Tries to parse a content item by its path.
         If during the attempt we detected the file is not a content item, `None` is returned.
@@ -109,9 +111,7 @@ class ContentItemParser(BaseContentParser, metaclass=ParserMetaclass):
         if parser_cls := ContentItemParser.content_type_to_parser.get(content_type):
             try:
                 return ContentItemParser.parse(
-                    parser_cls,
-                    path,
-                    pack_marketplaces,
+                    parser_cls, path, pack_marketplaces, git_sha
                 )
             except IncorrectParserException as e:
                 return ContentItemParser.parse(
@@ -131,9 +131,10 @@ class ContentItemParser(BaseContentParser, metaclass=ParserMetaclass):
         parser_cls: Type["ContentItemParser"],
         path: Path,
         pack_marketplaces: List[MarketplaceVersions],
+        git_sha: Optional[str] = None,
         **kwargs,
     ) -> "ContentItemParser":
-        parser = parser_cls(path, pack_marketplaces, **kwargs)
+        parser = parser_cls(path, pack_marketplaces, git_sha=git_sha, **kwargs)
         logger.debug(f"Parsed {parser.node_id}")
         return parser
 
@@ -161,6 +162,33 @@ class ContentItemParser(BaseContentParser, metaclass=ParserMetaclass):
     @abstractmethod
     def marketplaces(self) -> List[MarketplaceVersions]:
         pass
+
+    def get_marketplaces(self, data: dict) -> List[MarketplaceVersions]:
+        if file_marketplaces := [
+            MarketplaceVersions(mp) for mp in data.get("marketplaces", [])
+        ]:
+            marketplaces = file_marketplaces
+        else:
+            marketplaces = self.pack_marketplaces
+
+        marketplaces_set = set(marketplaces).intersection(self.supported_marketplaces)
+        marketplaces_set = self.update_marketplaces_set_with_xsoar_values(
+            marketplaces_set
+        )
+        return sorted(marketplaces_set)
+
+    @staticmethod
+    def update_marketplaces_set_with_xsoar_values(marketplaces_set: set) -> set:
+        if (
+            MarketplaceVersions.XSOAR in marketplaces_set
+            and MarketplaceVersions.XSOAR_ON_PREM not in marketplaces_set
+        ):
+            marketplaces_set.add(MarketplaceVersions.XSOAR_SAAS)
+
+        if MarketplaceVersions.XSOAR_ON_PREM in marketplaces_set:
+            marketplaces_set.add(MarketplaceVersions.XSOAR)
+
+        return marketplaces_set
 
     @property
     @abstractmethod

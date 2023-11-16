@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Set
+from typing import List, Optional, Set
 
 from demisto_sdk.commands.common.constants import MarketplaceVersions
 from demisto_sdk.commands.common.handlers import JSON_Handler
@@ -13,9 +13,12 @@ json = JSON_Handler()
 
 class WizardParser(JSONContentItemParser, content_type=ContentType.WIZARD):
     def __init__(
-        self, path: Path, pack_marketplaces: List[MarketplaceVersions]
+        self,
+        path: Path,
+        pack_marketplaces: List[MarketplaceVersions],
+        git_sha: Optional[str] = None,
     ) -> None:
-        super().__init__(path, pack_marketplaces)
+        super().__init__(path, pack_marketplaces, git_sha=git_sha)
         self.dependency_packs: str = json.dumps(
             self.json_data.get("dependency_packs") or []
         )
@@ -25,7 +28,11 @@ class WizardParser(JSONContentItemParser, content_type=ContentType.WIZARD):
 
     @property
     def supported_marketplaces(self) -> Set[MarketplaceVersions]:
-        return {MarketplaceVersions.XSOAR}
+        return {
+            MarketplaceVersions.XSOAR,
+            MarketplaceVersions.XSOAR_SAAS,
+            MarketplaceVersions.XSOAR_ON_PREM,
+        }
 
     def get_packs(self) -> List[str]:
         packs: List[str] = []

@@ -21,6 +21,9 @@ from demisto_sdk.commands.common.constants import (
     RELIABILITY_PARAMETER_NAMES,
     RN_CONTENT_ENTITY_WITH_STARS,
     RN_HEADER_BY_FILE_TYPE,
+    SUPPORT_LEVEL_HEADER,
+    XSOAR_CONTEXT_AND_OUTPUTS_URL,
+    XSOAR_SUPPORT,
     FileType,
     MarketplaceVersions,
 )
@@ -332,6 +335,10 @@ ERROR_CODE: Dict = {
         "code": "DS107",
         "related_field": "detaileddescription",
     },
+    "description_missing_dot_at_the_end": {
+        "code": "DS108",
+        "related_field": "description",
+    },
     # GF - Generic Fields
     "invalid_generic_field_group_value": {
         "code": "GF100",
@@ -581,14 +588,6 @@ ERROR_CODE: Dict = {
         "code": "IN127",
         "related_field": "display",
     },
-    "invalid_integration_deprecation__only_display_name_suffix": {
-        "code": "IN157",
-        "related_field": "deprecated",
-    },
-    "invalid_deprecation__only_description_deprecated": {
-        "code": "IN158",
-        "related_field": "deprecated",
-    },
     "invalid_deprecated_integration_description": {
         "code": "IN128",
         "related_field": "",
@@ -681,10 +680,6 @@ ERROR_CODE: Dict = {
         "code": "IN150",
         "related_field": "display",
     },
-    "invalid_siem_marketplaces_entry": {
-        "code": "IN151",
-        "related_field": "display",
-    },
     "empty_command_arguments": {
         "code": "IN151",
         "related_field": "arguments",
@@ -712,6 +707,26 @@ ERROR_CODE: Dict = {
     "nativeimage_exist_in_integration_yml": {
         "code": "IN157",
         "related_field": "script",
+    },
+    "invalid_deprecation__only_description_deprecated": {
+        "code": "IN158",
+        "related_field": "deprecated",
+    },
+    "command_reputation_output_capitalization_incorrect": {
+        "code": "IN159",
+        "related_field": "outputs",
+    },
+    "invalid_integration_deprecation__only_display_name_suffix": {
+        "code": "IN160",
+        "related_field": "deprecated",
+    },
+    "invalid_siem_marketplaces_entry": {
+        "code": "IN161",
+        "related_field": "display",
+    },
+    "partner_collector_does_not_have_xsoar_support_level": {
+        "code": "IN162",
+        "related_field": "",
     },
     # IT - Incident Types
     "incident_type_integer_field": {
@@ -1404,6 +1419,10 @@ ERROR_CODE: Dict = {
         "code": "CR101",
         "related_field": "",
     },
+    "correlation_rules_missing_search_window": {
+        "code": "CR102",
+        "related_field": "",
+    },
     # XR - XSIAM Reports
     "xsiam_report_files_naming_error": {
         "code": "XR100",
@@ -1486,6 +1505,7 @@ ALLOWED_IGNORE_ERRORS = (
         "BA119",
         "BA124",
         "BA125",
+        "DS108",
         "DS107",
         "GF102",
         "IF100",
@@ -2209,6 +2229,11 @@ class Errors:
 
     @staticmethod
     @error_code_decorator
+    def partner_collector_does_not_have_xsoar_support_level(path: str):
+        return f"the integration {path} should have the key {SUPPORT_LEVEL_HEADER} = {XSOAR_SUPPORT} in its yml"
+
+    @staticmethod
+    @error_code_decorator
     def invalid_deprecated_integration_description():
         return (
             "The description of all deprecated integrations should follow one of the formats:"
@@ -2921,6 +2946,13 @@ class Errors:
     @error_code_decorator
     def description_contains_demisto_word(line_nums, yml_or_file):
         return f"Found the word 'Demisto' in the description content {yml_or_file} in lines: {line_nums}."
+
+    @staticmethod
+    @error_code_decorator
+    def description_missing_dot_at_the_end(details: str):
+        return (
+            f'Description must end with a period ("."), fix the following:\n{details}'
+        )
 
     @staticmethod
     @error_code_decorator
@@ -4373,3 +4405,18 @@ class Errors:
     @error_code_decorator
     def pack_have_nonignorable_error(nonignorable_errors: List[str]):
         return f"The following errors can not be ignored: {', '.join(nonignorable_errors)}, remove them from .pack-ignore files"
+
+    @staticmethod
+    @error_code_decorator
+    def correlation_rules_missing_search_window():
+        return "The 'search_window' key must exist and cannot be empty when the 'execution_mode' is set to 'SCHEDULED'."
+
+    @staticmethod
+    @error_code_decorator
+    def command_reputation_output_capitalization_incorrect(
+        command_name: str,
+        invalid_output: str,
+        reputation_name: str,
+    ):
+        return f"The {command_name} command returns the following reputation output:\n{invalid_output} for reputation: {reputation_name}.\
+The capitalization is incorrect. For further information refer to {XSOAR_CONTEXT_AND_OUTPUTS_URL}"

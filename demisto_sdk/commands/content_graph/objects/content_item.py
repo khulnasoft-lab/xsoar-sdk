@@ -30,6 +30,7 @@ from demisto_sdk.commands.common.tools import (
     get_file,
     get_pack_name,
     replace_incident_to_alert,
+    write_dict,
 )
 from demisto_sdk.commands.content_graph.common import (
     ContentType,
@@ -55,14 +56,32 @@ class ContentItem(BaseContent):
     is_test: bool = False
 
     @validator("path", always=True)
-    def validate_path(cls, v: Path) -> Path:
+    def validate_path(cls, v: Path, values) -> Path:
         if v.is_absolute():
             return v
-        return CONTENT_PATH / v
+        if not CONTENT_PATH.name:
+            return CONTENT_PATH / v
+        return CONTENT_PATH.with_name(values.get("source_repo", "content")) / v
 
     @property
     def pack_id(self) -> str:
         return self.in_pack.pack_id if self.in_pack else ""
+
+    @property
+    def support_level(self) -> str:
+        return (
+            self.in_pack.support_level
+            if self.in_pack and self.in_pack.support_level
+            else ""
+        )
+
+    @property
+    def ignored_errors(self) -> list:
+        return (
+            self.in_pack.ignored_errors_dict.get(self.path.name, [])
+            if self.in_pack and self.in_pack.ignored_errors_dict
+            else []
+        )
 
     @property
     def pack_name(self) -> str:
@@ -105,11 +124,11 @@ class ContentItem(BaseContent):
             List[RelationshipData]:
                 RelationshipData:
                     relationship_type: RelationshipType
-                    source: BaseContent
-                    target: BaseContent
+                    source: BaseNode
+                    target: BaseNode
 
                     # this is the attribute we're interested in when querying
-                    content_item: BaseContent
+                    content_item: BaseNode
 
                     # Whether the relationship between items is direct or not
                     is_direct: bool
@@ -148,11 +167,11 @@ class ContentItem(BaseContent):
             List[RelationshipData]:
                 RelationshipData:
                     relationship_type: RelationshipType
-                    source: BaseContent
-                    target: BaseContent
+                    source: BaseNode
+                    target: BaseNode
 
                     # this is the attribute we're interested in when querying
-                    content_item: BaseContent
+                    content_item: BaseNode
 
                     # Whether the relationship between items is direct or not
                     is_direct: bool
@@ -179,6 +198,13 @@ class ContentItem(BaseContent):
     @property
     def data(self) -> dict:
         return get_file(self.path, keep_order=False)
+
+    @property
+    def ordered_data(self) -> dict:
+        return get_file(self.path, keep_order=True)
+
+    def save(self):
+        super()._save(self.path, self.ordered_data)
 
     def prepare_for_upload(
         self,
@@ -277,11 +303,11 @@ class ContentItem(BaseContent):
             return
         dir.mkdir(exist_ok=True, parents=True)
         try:
-            with (dir / self.normalize_name).open("w") as f:
-                self.handler.dump(
-                    self.prepare_for_upload(current_marketplace=marketplace),
-                    f,
-                )
+            write_dict(
+                dir / self.normalize_name,
+                data=self.prepare_for_upload(current_marketplace=marketplace),
+                handler=self.handler,
+            )
         except FileNotFoundError as e:
             logger.warning(f"Failed to dump {self.path} to {dir}: {e}")
 

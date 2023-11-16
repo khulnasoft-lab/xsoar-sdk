@@ -1,4 +1,5 @@
 import glob
+import logging
 import os
 import shutil
 from configparser import ConfigParser
@@ -6,7 +7,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Callable, List, Optional, Tuple, Union
 
-import git
 import pytest
 import requests
 
@@ -25,9 +25,29 @@ from demisto_sdk.commands.common.constants import (
     SCRIPTS_DIR,
     TEST_PLAYBOOKS_DIR,
     TRIGGER_DIR,
+    XPANSE_INLINE_PREFIX_TAG,
+    XPANSE_INLINE_SUFFIX_TAG,
+    XPANSE_PREFIX_TAG,
+    XPANSE_SUFFIX_TAG,
     XSIAM_DASHBOARDS_DIR,
+    XSIAM_INLINE_PREFIX_TAG,
+    XSIAM_INLINE_SUFFIX_TAG,
+    XSIAM_PREFIX_TAG,
     XSIAM_REPORTS_DIR,
+    XSIAM_SUFFIX_TAG,
     XSOAR_CONFIG_FILE,
+    XSOAR_INLINE_PREFIX_TAG,
+    XSOAR_INLINE_SUFFIX_TAG,
+    XSOAR_ON_PREM_INLINE_PREFIX_TAG,
+    XSOAR_ON_PREM_INLINE_SUFFIX_TAG,
+    XSOAR_ON_PREM_PREFIX_TAG,
+    XSOAR_ON_PREM_SUFFIX_TAG,
+    XSOAR_PREFIX_TAG,
+    XSOAR_SAAS_INLINE_PREFIX_TAG,
+    XSOAR_SAAS_INLINE_SUFFIX_TAG,
+    XSOAR_SAAS_PREFIX_TAG,
+    XSOAR_SAAS_SUFFIX_TAG,
+    XSOAR_SUFFIX_TAG,
     FileType,
     MarketplaceVersions,
 )
@@ -61,7 +81,6 @@ from demisto_sdk.commands.common.tools import (
     get_dict_from_file,
     get_display_name,
     get_entity_id_by_entity_type,
-    get_entity_name_by_entity_type,
     get_file,
     get_file_displayed_name,
     get_file_version_suffix_if_exists,
@@ -89,10 +108,10 @@ from demisto_sdk.commands.common.tools import (
     is_pack_path,
     is_uuid,
     parse_multiple_path_inputs,
-    retrieve_file_ending,
     run_command_os,
     search_and_delete_from_conf,
     server_version_compare,
+    set_value,
     str2bool,
     string_to_bool,
     to_kebab_case,
@@ -115,11 +134,13 @@ from demisto_sdk.tests.constants_test import (
     VALID_INCIDENT_TYPE_PATH,
     VALID_INTEGRATION_TEST_PATH,
     VALID_LAYOUT_PATH,
+    VALID_LIST_PATH,
     VALID_MD,
     VALID_PLAYBOOK_ID_PATH,
     VALID_REPUTATION_FILE,
     VALID_SCRIPT_PATH,
     VALID_WIDGET_PATH,
+    VULTURE_WHITELIST_PATH,
 )
 from demisto_sdk.tests.test_files.validate_integration_test_valid_types import (
     LAYOUT,
@@ -131,7 +152,7 @@ from TestSuite.file import File
 from TestSuite.pack import Pack
 from TestSuite.playbook import Playbook
 from TestSuite.repo import Repo
-from TestSuite.test_tools import ChangeCWD
+from TestSuite.test_tools import ChangeCWD, str_in_call_args_list
 
 GIT_ROOT = git_path()
 
@@ -276,7 +297,7 @@ class TestGenericFunctions:
         "dir_path", ["demisto_sdk", f"{GIT_ROOT}/demisto_sdk/tests/test_files"]
     )
     def test_get_yml_paths_in_dir(self, dir_path):
-        yml_paths, first_yml_path = tools.get_yml_paths_in_dir(dir_path, error_msg="")
+        yml_paths, first_yml_path = tools.get_yml_paths_in_dir(dir_path)
         yml_paths_test = glob.glob(os.path.join(dir_path, "*yml"))
         assert sorted(yml_paths) == sorted(yml_paths_test)
         if yml_paths_test:
@@ -315,6 +336,7 @@ class TestGenericFunctions:
         (VALID_GENERIC_FIELD_PATH, FileType.GENERIC_FIELD),
         (VALID_GENERIC_MODULE_PATH, FileType.GENERIC_MODULE),
         (VALID_GENERIC_DEFINITION_PATH, FileType.GENERIC_DEFINITION),
+        (VALID_LIST_PATH, FileType.LISTS),
         (IGNORED_PNG, None),
         ("Author_image.png", FileType.AUTHOR_IMAGE),
         (FileType.PACK_IGNORE.value, FileType.PACK_IGNORE),
@@ -322,6 +344,7 @@ class TestGenericFunctions:
         (Path(DOC_FILES_DIR) / "foo", FileType.DOC_FILE),
         (METADATA_FILE_NAME, FileType.METADATA),
         ("", None),
+        (VULTURE_WHITELIST_PATH, FileType.VULTURE_WHITELIST),
     ]
 
     @pytest.mark.parametrize("path, _type", data_test_find_type)
@@ -456,10 +479,6 @@ class TestGenericFunctions:
         files = filter_files_by_type(files, types)
 
         assert files == output
-
-    @pytest.mark.parametrize("path, output", [("demisto.json", "json"), ("wow", "")])
-    def test_retrieve_file_ending(self, path, output):
-        assert retrieve_file_ending(path) == output
 
     @pytest.mark.parametrize(
         "data, entity, output",
@@ -606,12 +625,12 @@ class TestGetRemoteFileLocally:
     FILE_NAME = "somefile.json"
     FILE_CONTENT = '{"id": "some_file"}'
 
-    git_util = GitUtil(repo=Content.git())
+    git_util = Content.git_util()
     main_branch = git_util.handle_prev_ver()[1]
 
     def setup_method(self):
         # create local git repo
-        example_repo = git.Repo.init(self.REPO_NAME)
+        example_repo = GitUtil.REPO_CLS.init(self.REPO_NAME)
         origin_branch = self.main_branch
         if not origin_branch.startswith("origin"):
             origin_branch = "origin/" + origin_branch
@@ -708,17 +727,6 @@ class TestEntityAttributes:
     )
     def test_get_entity_id_by_entity_type(self, data, entity):
         assert get_entity_id_by_entity_type(data, entity) == 1
-
-    @pytest.mark.parametrize(
-        "data, entity",
-        [
-            ({"typeId": "wow"}, LAYOUTS_DIR),
-            ({"name": "wow"}, LAYOUTS_DIR),
-            ({"name": "wow"}, PLAYBOOKS_DIR),
-        ],
-    )
-    def test_get_entity_name_by_entity_type(self, data, entity):
-        assert get_entity_name_by_entity_type(data, entity) == "wow"
 
 
 class TestGetFilesInDir:
@@ -1417,7 +1425,7 @@ def test_get_file_displayed_name__image(repo):
     integration.create_default_integration()
     with ChangeCWD(repo.path):
         display_name = get_file_displayed_name(integration.image.path)
-        assert display_name == os.path.basename(integration.image.rel_path)
+        assert display_name == Path(integration.image.rel_path).name
 
 
 INCIDENTS_TYPE_FILES_INPUTS = [
@@ -2347,7 +2355,7 @@ class TestTagParser:
         prefix = "<>"
         suffix = "</>"
         text = "some text"
-        tag_parser = TagParser(prefix, suffix, remove_tag_text=False)
+        tag_parser = TagParser("FAKE_LABEL")
         for tag in (prefix, suffix):
             assert tag_parser.parse(text + tag) == text + tag
 
@@ -2362,12 +2370,10 @@ class TestTagParser:
         Then:
             - Text shouldn't have tags or their text
         """
-        prefix = "<>"
-        suffix = "</>"
-        text = "some text<>more text</>"
+        text = "some text<~>more text</~>"
         expected_text = "some text"
-        tag_parser = TagParser(prefix, suffix, remove_tag_text=True)
-        assert tag_parser.parse(text) == expected_text
+        tag_parser = TagParser("")
+        assert tag_parser.parse(text, True) == expected_text
 
     def test_remove_tags_only(self):
         """
@@ -2380,25 +2386,79 @@ class TestTagParser:
         Then:
             - Text shouldn't have tags, but keep the text
         """
-        prefix = "<>"
-        suffix = "</>"
-        text = "some text <>tag text</>"
+        text = "some text <~>tag text</~>"
         expected_text = "some text tag text"
-        tag_parser = TagParser(prefix, suffix, remove_tag_text=False)
+        tag_parser = TagParser("")
         assert tag_parser.parse(text) == expected_text
 
 
 class TestMarketplaceTagParser:
     MARKETPLACE_TAG_PARSER = MarketplaceTagParser()
+    XSOAR_PREFIX = XSOAR_PREFIX_TAG
+    XSOAR_SUFFIX = XSOAR_SUFFIX_TAG
+    XSOAR_INLINE_PREFIX = XSOAR_INLINE_PREFIX_TAG
+    XSOAR_INLINE_SUFFIX = XSOAR_INLINE_SUFFIX_TAG
+
+    XSIAM_PREFIX = XSIAM_PREFIX_TAG
+    XSIAM_SUFFIX = XSIAM_SUFFIX_TAG
+    XSIAM_INLINE_PREFIX = XSIAM_INLINE_PREFIX_TAG
+    XSIAM_INLINE_SUFFIX = XSIAM_INLINE_SUFFIX_TAG
+
+    XPANSE_PREFIX = XPANSE_PREFIX_TAG
+    XPANSE_SUFFIX = XPANSE_SUFFIX_TAG
+    XPANSE_INLINE_PREFIX = XPANSE_INLINE_PREFIX_TAG
+    XPANSE_INLINE_SUFFIX = XPANSE_INLINE_SUFFIX_TAG
+
+    XSOAR_SAAS_PREFIX = XSOAR_SAAS_PREFIX_TAG
+    XSOAR_SAAS_SUFFIX = XSOAR_SAAS_SUFFIX_TAG
+    XSOAR_SAAS_INLINE_PREFIX = XSOAR_SAAS_INLINE_PREFIX_TAG
+    XSOAR_SAAS_INLINE_SUFFIX = XSOAR_SAAS_INLINE_SUFFIX_TAG
+
+    XSOAR_ON_PREM_PREFIX = XSOAR_ON_PREM_PREFIX_TAG
+    XSOAR_ON_PREM_SUFFIX = XSOAR_ON_PREM_SUFFIX_TAG
+    XSOAR_ON_PREM_INLINE_PREFIX = XSOAR_ON_PREM_INLINE_PREFIX_TAG
+    XSOAR_ON_PREM_INLINE_SUFFIX = XSOAR_ON_PREM_INLINE_SUFFIX_TAG
+
     TEXT_WITH_TAGS = f"""
 ### Sections:
-{MARKETPLACE_TAG_PARSER.XSOAR_PREFIX} - XSOAR PARAGRAPH{MARKETPLACE_TAG_PARSER.XSOAR_SUFFIX}
-{MARKETPLACE_TAG_PARSER.XSIAM_PREFIX} - XSIAM PARAGRAPH{MARKETPLACE_TAG_PARSER.XSIAM_SUFFIX}
-{MARKETPLACE_TAG_PARSER.XPANSE_PREFIX} - XPANSE PARAGRAPH{MARKETPLACE_TAG_PARSER.XPANSE_SUFFIX}
+{XSOAR_PREFIX} - ALL XSOAR MARKETPLACE PARAGRAPH {XSOAR_SUFFIX}
+{XSIAM_PREFIX} - XSIAM PARAGRAPH {XSIAM_SUFFIX}
+{XPANSE_PREFIX} - XPANSE PARAGRAPH {XPANSE_SUFFIX}
+{XSOAR_SAAS_PREFIX} - ONLY XSOAR_SAAS PARAGRAPH {XSOAR_SAAS_SUFFIX}
+{XSOAR_ON_PREM_PREFIX} - ONLY XSOAR_ON_PREM PARAGRAPH {XSOAR_ON_PREM_SUFFIX}
 ### Inline:
-{MARKETPLACE_TAG_PARSER.XSOAR_INLINE_PREFIX}xsoar inline text{MARKETPLACE_TAG_PARSER.XSOAR_INLINE_SUFFIX}
-{MARKETPLACE_TAG_PARSER.XSIAM_INLINE_PREFIX}xsiam inline text{MARKETPLACE_TAG_PARSER.XSIAM_INLINE_SUFFIX}
-{MARKETPLACE_TAG_PARSER.XPANSE_INLINE_PREFIX}xpanse inline text{MARKETPLACE_TAG_PARSER.XPANSE_INLINE_SUFFIX}"""
+{XSOAR_INLINE_PREFIX} all xsoar marketplaces inline text {XSOAR_INLINE_SUFFIX}
+{XSIAM_INLINE_PREFIX} xsiam inline text {XSIAM_INLINE_SUFFIX}
+{XPANSE_INLINE_PREFIX} xpanse inline text {XPANSE_INLINE_SUFFIX}
+{XSOAR_SAAS_INLINE_PREFIX} xsoar_saas inline test {XSOAR_SAAS_INLINE_SUFFIX}
+{XSOAR_ON_PREM_INLINE_PREFIX} xsoar_on_prem inline test {XSOAR_ON_PREM_INLINE_SUFFIX}"""
+
+    def check_prefix_not_in_text(self, actual):
+        assert self.XSOAR_PREFIX not in actual
+        assert self.XSIAM_PREFIX not in actual
+        assert self.XPANSE_PREFIX not in actual
+        assert self.XSOAR_SAAS_PREFIX not in actual
+        assert self.XSOAR_ON_PREM_PREFIX not in actual
+
+    def check_xsiam_not_in_text(self, actual):
+        assert "XSIAM" not in actual
+        assert "xsiam" not in actual
+
+    def check_xpanse_not_in_text(self, actual):
+        assert "XPANSE" not in actual
+        assert "xpanse" not in actual
+
+    def check_xsoar_saas_not_in_text(self, actual):
+        assert "XSOAR_SAAS" not in actual
+        assert "XSOAR saas" not in actual
+
+    def check_xsoar_on_prem_not_in_text(self, actual):
+        assert "XSOAR_ON_PREM" not in actual
+        assert "xsoar_on_prem" not in actual
+
+    def check_all_xsoar_not_in_text(self, actual):
+        assert "ALL XSOAR MARKETPLACE PARAGRAPH" not in actual
+        assert "all xsoar marketplaces inline text" not in actual
 
     def test_invalid_marketplace_version(self):
         """
@@ -2414,15 +2474,12 @@ class TestMarketplaceTagParser:
         actual = self.MARKETPLACE_TAG_PARSER.parse_text(self.TEXT_WITH_TAGS)
         assert "### Sections:" in actual
         assert "### Inline:" in actual
-        assert self.MARKETPLACE_TAG_PARSER.XSOAR_PREFIX not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XSIAM_PREFIX not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XPANSE_PREFIX not in actual
-        assert "XSOAR" not in actual
-        assert "xsoar" not in actual
-        assert "XSIAM" not in actual
-        assert "xsiam" not in actual
-        assert "XPANSE" not in actual
-        assert "xpanse" not in actual
+        self.check_prefix_not_in_text(actual)
+        self.check_xsiam_not_in_text(actual)
+        self.check_xpanse_not_in_text(actual)
+        self.check_xsoar_saas_not_in_text(actual)
+        self.check_xsoar_on_prem_not_in_text(actual)
+        self.check_all_xsoar_not_in_text(actual)
 
     def test_xsoar_marketplace_version(self):
         """
@@ -2438,15 +2495,14 @@ class TestMarketplaceTagParser:
         actual = self.MARKETPLACE_TAG_PARSER.parse_text(self.TEXT_WITH_TAGS)
         assert "### Sections:" in actual
         assert "### Inline:" in actual
-        assert "XSOAR" in actual
-        assert "xsoar" in actual
-        assert self.MARKETPLACE_TAG_PARSER.XSOAR_PREFIX not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XSIAM_PREFIX not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XPANSE_PREFIX not in actual
-        assert "XSIAM" not in actual
-        assert "xsiam" not in actual
-        assert "XPANSE" not in actual
-        assert "xpanse" not in actual
+        assert "ALL XSOAR MARKETPLACE PARAGRAPH" in actual
+        assert "all xsoar marketplaces inline text" in actual
+        assert "xsoar_on_prem" in actual
+        assert "XSOAR_ON_PREM" in actual
+        self.check_prefix_not_in_text(actual)
+        self.check_xsiam_not_in_text(actual)
+        self.check_xpanse_not_in_text(actual)
+        self.check_xsoar_saas_not_in_text(actual)
 
     def test_xsiam_marketplace_version(self):
         """
@@ -2464,15 +2520,13 @@ class TestMarketplaceTagParser:
         actual = self.MARKETPLACE_TAG_PARSER.parse_text(self.TEXT_WITH_TAGS)
         assert "### Sections:" in actual
         assert "### Inline:" in actual
-        assert "XSOAR" not in actual
-        assert "xsoar" not in actual
-        assert "XPANSE" not in actual
-        assert "xpanse" not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XSOAR_PREFIX not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XSIAM_PREFIX not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XPANSE_PREFIX not in actual
         assert "XSIAM" in actual
         assert "xsiam" in actual
+        self.check_all_xsoar_not_in_text(actual)
+        self.check_xpanse_not_in_text(actual)
+        self.check_xsoar_on_prem_not_in_text(actual)
+        self.check_xsoar_saas_not_in_text(actual)
+        self.check_prefix_not_in_text(actual)
 
     def test_xpanse_marketplace_version(self):
         """
@@ -2488,15 +2542,68 @@ class TestMarketplaceTagParser:
         actual = self.MARKETPLACE_TAG_PARSER.parse_text(self.TEXT_WITH_TAGS)
         assert "### Sections:" in actual
         assert "### Inline:" in actual
-        assert "XSOAR" not in actual
-        assert "xsoar" not in actual
-        assert "XSIAM" not in actual
-        assert "xsiam" not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XSOAR_PREFIX not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XSIAM_PREFIX not in actual
-        assert self.MARKETPLACE_TAG_PARSER.XPANSE_PREFIX not in actual
         assert "XPANSE" in actual
         assert "xpanse" in actual
+        self.check_prefix_not_in_text(actual)
+        self.check_all_xsoar_not_in_text(actual)
+        self.check_xsiam_not_in_text(actual)
+        self.check_xsoar_on_prem_not_in_text(actual)
+        self.check_xsoar_saas_not_in_text(actual)
+
+    def test_xsoar_saas_marketplace_version(self):
+        """
+        Check that xsoar_saas text and xsoar text is in text
+        """
+        self.MARKETPLACE_TAG_PARSER.marketplace = MarketplaceVersions.XSOAR_SAAS.value
+        actual = self.MARKETPLACE_TAG_PARSER.parse_text(self.TEXT_WITH_TAGS)
+        assert "### Sections:" in actual
+        assert "### Inline:" in actual
+        assert "xsoar_saas" in actual
+        assert "XSOAR_SAAS" in actual
+        assert "ALL XSOAR MARKETPLACE PARAGRAPH" in actual
+        assert "all xsoar marketplaces inline text" in actual
+        self.check_prefix_not_in_text(actual)
+        self.check_xsiam_not_in_text(actual)
+        self.check_xpanse_not_in_text(actual)
+        self.check_xsoar_on_prem_not_in_text(actual)
+
+    def test_xsoar_on_prem_marketplace_version(self):
+        """
+        Check that xsoar_saas text and xsoar text is in text
+        """
+        self.MARKETPLACE_TAG_PARSER.marketplace = (
+            MarketplaceVersions.XSOAR_ON_PREM.value
+        )
+        actual = self.MARKETPLACE_TAG_PARSER.parse_text(self.TEXT_WITH_TAGS)
+        assert "### Sections:" in actual
+        assert "### Inline:" in actual
+        assert "xsoar_on_prem" in actual
+        assert "XSOAR_ON_PREM" in actual
+        assert "ALL XSOAR MARKETPLACE PARAGRAPH" in actual
+        assert "all xsoar marketplaces inline text" in actual
+        self.check_prefix_not_in_text(actual)
+        self.check_xsiam_not_in_text(actual)
+        self.check_xpanse_not_in_text(actual)
+        self.check_xsoar_saas_not_in_text(actual)
+
+    def test_xsoar_should_remove_text(self):
+        """
+        Check that if xsoar tag is specified all the xsoar-saas marketplaces will be should removed true.
+        """
+        mtp = MarketplaceTagParser(MarketplaceVersions.XSOAR.value)
+        assert mtp._should_remove_xsoar_text is False
+        assert mtp._should_remove_xsoar_on_prem_text is False
+        assert mtp._should_remove_xsoar_saas_text is True
+        mtp = MarketplaceTagParser(MarketplaceVersions.XSOAR_SAAS.value)
+        assert mtp._should_remove_xsoar_text is False
+        assert mtp._should_remove_xsoar_on_prem_text is True
+        assert mtp._should_remove_xsoar_saas_text is False
+        mtp = MarketplaceTagParser(MarketplaceVersions.XSOAR_ON_PREM.value)
+        assert mtp._should_remove_xsoar_text is False
+        assert mtp._should_remove_xsoar_on_prem_text is False
+        assert mtp._should_remove_xsoar_saas_text is True
+        mtp = MarketplaceTagParser(MarketplaceVersions.MarketplaceV2.value)
+        assert mtp._should_remove_xsoar_text is True
 
 
 @pytest.mark.parametrize(
@@ -2511,6 +2618,7 @@ class TestMarketplaceTagParser:
         ({"layout": {"id": "Testlayout"}}, "Testlayout"),
         ({"dashboards_data": [{"name": "D Name"}]}, "D Name"),
         ({"templates_data": [{"report_name": "R Name"}]}, "R Name"),
+        ({"id": "Test1", "details": "Test2"}, "Test2"),  # IndicatorType Content Items
     ],
 )
 def test_get_display_name(data, answer, tmpdir):
@@ -3071,6 +3179,32 @@ def test_get_content_path(input_path, expected_output):
     assert tools.get_content_path(input_path) == expected_output
 
 
+def test_get_content_path_no_remote(mocker):
+    """
+    Given:
+        - A path to a file or directory in the content repo, with no remote
+    When:
+        - Running get_content_path
+    Then:
+        Validate that a warning is issued as (resulting from a raised exception).
+    """
+    from git import Repo  # noqa: TID251
+
+    def raise_value_exception(name):
+        raise ValueError()
+
+    mocker.patch.object(Repo, "remote", side_effect=raise_value_exception)
+    mocker.patch(
+        "demisto_sdk.commands.common.tools.is_external_repository", return_value=False
+    )
+    logger_info = mocker.patch.object(logging.getLogger("demisto-sdk"), "info")
+    tools.get_content_path(Path("/User/username/test"))
+    assert str_in_call_args_list(
+        logger_info.call_args_list,
+        "[yellow]Please run demisto-sdk in content repository![/yellow]",
+    )
+
+
 @pytest.mark.parametrize(
     "string, expected_result",
     [
@@ -3103,3 +3237,37 @@ def test_is_epoch_datetime(string: str, expected_result: bool):
     from demisto_sdk.commands.common.tools import is_epoch_datetime
 
     assert is_epoch_datetime(string) == expected_result
+
+
+@pytest.mark.parametrize(
+    "dict, paths, value, expected_dict",
+    [
+        ({"test": "1"}, ["test"], 2, {"test": 2}),
+        ({"test": [1, 2, 3, 4]}, ["test[3]"], 2, {"test": [1, 2, 3, 2]}),
+        ({"test1": "1"}, ["test2", "test1"], 2, {"test1": 2}),
+        ({"test": "1"}, ["test2", "test1"], 2, {"test": "1", "test1": 2}),
+        ({"test": {"test2": 1}}, ["test.test2"], 2, {"test": {"test2": 2}}),
+    ],
+)
+def test_set_value(dict, paths, value, expected_dict):
+    """
+    Given:
+        a dictionary, path / list of paths, and a value to insert to the dict.
+        - Case 1: dict with items only in the root, a list with a path that exist in the dict, and a value to set there.
+        - Case 2: dict with a list in the root, a list with a path with the index in the list to replace, and a value to set there.
+        - Case 3: dict with items only in the root, a list of possible paths where one of them is in the dict, and a value to set there.
+        - Case 4: dict with items only in the root, a list of possible paths where none of them is in the dict, and a value to set there.
+        - Case 5: dict with items not only in the root, a list with a path not to the root that exist in the dict, and a value to set there.
+
+    When:
+        - run set_value
+    Then:
+        - Ensure that the value was inserted in the right place.
+        - Case 1: the dict should replce the value in the key.
+        - Case 2: the dict will have the value in the right index in the list.
+        - Case 3: the dict has the value changed in the key that existed and will not add keys in paths that doesn't exist.
+        - Case 4: the dict has the value added in the last given key.
+        - Case 5: the dict should replce the value in the key.
+    """
+    set_value(dict, paths, value)
+    assert expected_dict == dict

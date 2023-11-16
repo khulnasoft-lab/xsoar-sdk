@@ -9,6 +9,8 @@
 The Demisto SDK library can be used to manage your Cortex XSOAR content with ease and efficiency.
 The library supports Python 3.8-3.10. _Python 3.8 support will be removed soon._
 
+In order to function properly, the Demisto SDK requires git to be installed. If git isn't installed, an appropriate message will be raised.
+
 ## Usage
 
 ### Installation
@@ -38,6 +40,12 @@ The library supports Python 3.8-3.10. _Python 3.8 support will be removed soon._
       In order to set Demisto SDK to work with Cortex XSOAR instance, you need to delete the XSIAM_AUTH_ID parameter from your environment.
       ```bash
       unset XSIAM_AUTH_ID
+      ```
+
+      In case the primary git branch is not **master**, or the upstream is not named **origin**, set them with environment variables:
+      ```bash
+      export DEMISTO_DEFAULT_BRANCH = <branch name here>
+      export DEMISTO_DEFAULT_REMOTE = <upstream name here>
       ```
 
       >For more configurations, check the [demisto-py](https://github.com/demisto/demisto-py) repo (the SDK uses demisto-py to communicate with Cortex XSOAR).
@@ -109,6 +117,7 @@ Supported commands:
 21. [generate-unit-tests](https://github.com/demisto/demisto-sdk/blob/master/demisto_sdk/commands/generate_unit_tests/README.md)
 22. [pre-commit (experimental)](https://github.com/demisto/demisto-sdk/blob/master/demisto_sdk/commands/pre_commit/README.md)
 ---
+23. [setup-env](https://github.com/demisto/demisto-sdk/blob/master/demisto_sdk/commands/setup_env/README.md)
 
 ### Customizable command configuration
 
@@ -144,23 +153,6 @@ include_untracked=true
 ```INI
 [update-release-notes]
 update_type=minor
-```
-
----
-
-### Autocomplete
-
-Our CLI supports autocomplete for Linux/MacOS machines, you can turn this feature on by running one of the following:
-for zsh users run in the terminal
-
-```bash
-eval "$(_DEMISTO_SDK_COMPLETE=source_zsh demisto-sdk)"
-```
-
-for regular bashrc users run in the terminal
-
-```bash
-eval "$(_DEMISTO_SDK_COMPLETE=source demisto-sdk)"
 ```
 
 ---
