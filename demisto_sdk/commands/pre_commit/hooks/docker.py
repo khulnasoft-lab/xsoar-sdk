@@ -134,6 +134,16 @@ def get_environment_flag() -> str:
     return f'--env "PYTHONPATH={get_docker_python_path()}"'
 
 
+def _split_by_obj(
+    files_with_objects: Iterable[Tuple[Path, Optional[IntegrationScript]]]
+) -> Dict[str, Set[Path]]:
+    folder_to_files = defaultdict(set)
+    for file, obj in files_with_objects:
+        if obj:
+            folder_to_files[obj.path.parent].add(file)
+    return folder_to_files
+
+
 def _split_by_config_file(files, config_arg: Optional[Tuple]):
     """
     Will group files into groups that share the same configuration file.
@@ -179,6 +189,7 @@ class DockerHook(Hook):
         """
         if not run_docker_hooks:
             return
+        run_in_cwd = self._get_property("cwd", False)
         start_time = time.time()
         filtered_files = self.filter_files_matching_hook_config(
             (file for file, _ in files_to_run_with_objects)
@@ -206,7 +217,10 @@ class DockerHook(Hook):
         ):
 
             paths = {file for file, obj in files_with_objects}
-            folder_to_files = _split_by_config_file(paths, config_arg)
+            if run_in_cwd:
+                folder_to_files = _split_by_obj(files_with_objects)
+            else:
+                folder_to_files = _split_by_config_file(paths, config_arg)
             image_is_powershell = any(
                 obj.is_powershell for _, obj in files_with_objects
             )
