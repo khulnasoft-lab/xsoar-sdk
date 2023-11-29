@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Literal, Optional, Set, Tuple, Union
 
 from docker.errors import DockerException
 
@@ -134,36 +134,28 @@ def get_environment_flag() -> str:
     return f'--env "PYTHONPATH={get_docker_python_path()}"'
 
 
-def _split_by_obj(
-    files_with_objects: Iterable[Tuple[Path, Optional[IntegrationScript]]]
-) -> Dict[str, Set[Path]]:
-    folder_to_files = defaultdict(set)
-    for file, obj in files_with_objects:
-        if obj:
-            folder_to_files[obj.path.parent].add(file)
-    return folder_to_files
-
-
-def _split_by_config_file(files, config_arg: Optional[Tuple]):
+def _split_by_config_file(files_with_objects: Iterable[Tuple[Path, Optional[IntegrationScript]]], config_arg: Optional[Tuple], split_by_obj: bool = False):
     """
     Will group files into groups that share the same configuration file.
     If there is no config file, they get set to the NO_CONFIG_VALUE group
     Args:
-        files: the files to split
+        files_with_objects: the files to split
         config_arg: a tuple, argument_name, file_name
 
     Returns:
         a dict where the keys are the names of the folder of the config and the value is a set of files for that config
     """
-    if not config_arg:
-        return {NO_CONFIG_VALUE: files}
+    if not config_arg and not split_by_obj:
+        return {NO_CONFIG_VALUE: files_with_objects}
     folder_to_files = defaultdict(set)
 
-    for file in files:
-        if (file.parent / config_arg[1]).exists():
-            folder_to_files[str(file.parent)].add(file)
+    for file, obj in files_with_objects:
+        if not obj:
+            continue
+        if split_by_obj or (obj.path.parent / config_arg[1]).exists():
+            folder_to_files[obj].add((file, obj))
         else:
-            folder_to_files[NO_CONFIG_VALUE].add(file)  # type:ignore
+            folder_to_files[NO_CONFIG_VALUE].add((file, obj))  # type:ignore
 
     return folder_to_files
 
@@ -216,11 +208,7 @@ class DockerHook(Hook):
             tag_to_files_objs.items(), key=lambda item: item[0]
         ):
 
-            paths = {file for file, obj in files_with_objects}
-            if run_in_cwd:
-                folder_to_files = _split_by_obj(files_with_objects)
-            else:
-                folder_to_files = _split_by_config_file(paths, config_arg)
+            folder_to_files = _split_by_config_file(files_to_run_with_objects, config_arg, run_in_cwd)
             image_is_powershell = any(
                 obj.is_powershell for _, obj in files_with_objects
             )
@@ -228,7 +216,7 @@ class DockerHook(Hook):
             dev_image = devtest_image(  # consider moving to before loop and threading.
                 image, image_is_powershell
             )
-            hooks = self.get_new_hooks(dev_image, image, folder_to_files, config_arg)
+            hooks = self.get_new_hooks(dev_image, image, folder_to_files, config_arg, run_in_cwd)
             self.hooks.extend(hooks)
 
         end_time = time.time()
@@ -240,8 +228,9 @@ class DockerHook(Hook):
         self,
         dev_image,
         image,
-        folder_to_files: Dict[str, Set[Path]],
+        folder_to_files: Dict[Optional[IntegrationScript], Set[Tuple[Path, IntegrationScript]]],
         config_arg: Optional[Tuple],
+        run_in_cwd: bool = False
     ):
         """
         Given the docker image and files to run on it, create new hooks to insert
@@ -262,21 +251,20 @@ class DockerHook(Hook):
         ] = f'--entrypoint {new_hook.get("entry")} {get_environment_flag()} {dev_image}'
 
         ret_hooks = []
-        counter = 0
-        for folder, files in folder_to_files.items():
+        for obj, files in folder_to_files.items():
             hook = deepcopy(new_hook)
-            if config_arg and folder is not NO_CONFIG_VALUE:
+            if config_arg and obj is not None:
                 args = deepcopy(self._get_property("args", []))
                 args.extend(
                     [
                         config_arg[0],  # type:ignore
-                        str(list(files)[0].parent / config_arg[1]),  # type:ignore
+                        str(obj.path.parent / config_arg[1]),  # type:ignore
                     ]  # type:ignore
                 )  # type:ignore
                 hook["args"] = args
-                hook["id"] = f"{hook['id']}-{counter}"  # for uniqueness
-                hook["name"] = f"{hook['name']}-{counter}"
-                counter += 1
+                hook["id"] = f"{hook['id']}-{obj.object_id}"  # for uniqueness
+                hook["name"] = f"{hook['name']}-{obj.object_id}"
+                hook["entry"]= f"-w {obj.path.parent} {new_hook['entry']}"
             if self._set_files_on_hook(hook, files):
                 ret_hooks.append(hook)
         for hook in ret_hooks:
