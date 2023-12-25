@@ -15,7 +15,6 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 from packaging.version import Version
 
 from demisto_sdk.commands.common.constants import (
-    API_MODULES_PACK,
     DEFAULT_PYTHON2_VERSION,
     DEFAULT_PYTHON_VERSION,
     INTEGRATIONS_DIR,
@@ -511,6 +510,51 @@ class PreCommitRunner:
         return ret_val
 
 
+def handle_api_modules(
+    graph: Optional[ContentGraphInterface],
+    integration_script: IntegrationScript,
+    language_to_files: Dict[str, Set],
+    integrations_scripts_mapping: Dict[Path, Set[Path]],
+):
+    """
+    This function handles the api modules of the integration script.
+    It adds the api modules to the language_to_files dict, to the integration which imports the api module, so it will be tested and linted by the same environment as the integration.
+    If the integration script is not api module, it will do nothing.
+
+    Args:
+        graph (Optional[ContentGraphInterface]): Graph Interface. Used to get the integrations objects which use the api module.
+        integration_script (IntegrationScript): The potential API Module to handle
+        language_to_files (Dict[str, Set]): The dictionary to add the api modules to.
+        integrations_scripts_mapping (Dict[Path, Set[Path]]): The mapping between the integration scripts and the paths to check.
+    """
+    if "ApiModule" in integration_script.object_id:
+        if not graph:
+            graph = ContentGraphInterface()
+            update_content_graph(graph)
+        graph_obj = graph.search(object_id=integration_script.object_id)[0]
+        assert isinstance(graph_obj, Script)
+        for obj in graph_obj.imported_by:
+            version = Version(
+                obj.python_version
+            )  # we can we sure this is a python integration
+            language = f"{version.major}.{version.minor}"
+            language_to_files[language].update(
+                {
+                    (
+                        path,
+                        obj,
+                    )  # Adding the path of the api modules to the imported_by object!
+                    for path in integrations_scripts_mapping[obj.path.parent]
+                },
+                {
+                    (
+                        integration_script.path.relative_to(CONTENT_PATH),
+                        obj,
+                    )
+                },
+            )
+
+
 def group_by_language(
     files: Set[Path],
 ) -> Tuple[Dict[str, Set[Tuple[Path, Optional[IntegrationScript]]]], Set[Path]]:
@@ -582,34 +626,14 @@ def group_by_language(
             version = Version(python_version)
             language = f"{version.major}.{version.minor}"
             # handle api modules
-            if (
-                integration_script.in_pack
-                and integration_script.in_pack.object_id == API_MODULES_PACK
-            ):
-                if not graph:
-                    graph = ContentGraphInterface()
-                    update_content_graph(graph)
-                graph_obj = graph.search(object_id=integration_script.object_id)[0]
-                assert isinstance(graph_obj, Script)
-                for obj in graph_obj.imported_by:
-                    language_to_files[language].update(
-                        {
-                            (
-                                path,
-                                obj,
-                            )  # Adding the path of the api modules to the imported_by object!
-                            for path in integrations_scripts_mapping[code_file_path]
-                        },
-                        {
-                            (
-                                integration_script.path.relative_to(CONTENT_PATH),
-                                integration_script,
-                            )
-                        },
-                    )
-
-                # no need to add the api modules without their
-                continue
+            handle_api_modules(
+                graph,
+                integration_script,
+                language_to_files,
+                integrations_scripts_mapping,
+            )
+            # no need to add the api modules for their own
+            continue
 
         else:
             language = integration_script.type
@@ -620,7 +644,6 @@ def group_by_language(
             },
             {(integration_script.path.relative_to(CONTENT_PATH), integration_script)},
         )
-
     if infra_files:
         language_to_files[DEFAULT_PYTHON_VERSION].update(
             [(infra, None) for infra in infra_files]
@@ -630,6 +653,9 @@ def group_by_language(
         logger.info(
             f"Skipping deprecated integrations or scripts: {join_files(exclude_integration_script, ', ')}"
         )
+    if graph:
+        graph.close()
+
     return language_to_files, exclude_integration_script
 
 
