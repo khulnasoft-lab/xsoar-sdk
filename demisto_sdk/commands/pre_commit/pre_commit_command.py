@@ -534,9 +534,8 @@ def handle_api_modules(
         graph_obj = graph.search(object_id=integration_script.object_id)[0]
         assert isinstance(graph_obj, Script)
         for obj in graph_obj.imported_by:
-            version = Version(
-                obj.python_version
-            )  # we can we sure this is a python integration
+            # we can be sure this is a python integration
+            version = Version(obj.python_version)
             language = f"{version.major}.{version.minor}"
             language_to_files[language].update(
                 {
@@ -545,13 +544,7 @@ def handle_api_modules(
                         obj,
                     )  # Adding the path of the api modules to the imported_by object!
                     for path in integrations_scripts_mapping[obj.path.parent]
-                },
-                {
-                    (
-                        integration_script.path.relative_to(CONTENT_PATH),
-                        obj,
-                    )
-                },
+                }
             )
 
 
