@@ -15,6 +15,7 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 from packaging.version import Version
 
 from demisto_sdk.commands.common.constants import (
+    API_MODULES_PACK,
     DEFAULT_PYTHON2_VERSION,
     DEFAULT_PYTHON_VERSION,
     INTEGRATIONS_DIR,
@@ -31,10 +32,13 @@ from demisto_sdk.commands.common.tools import (
     string_to_bool,
     write_dict,
 )
+from demisto_sdk.commands.content_graph.commands.update import update_content_graph
+from demisto_sdk.commands.content_graph.interface import ContentGraphInterface
 from demisto_sdk.commands.content_graph.objects.base_content import BaseContent
 from demisto_sdk.commands.content_graph.objects.integration_script import (
     IntegrationScript,
 )
+from demisto_sdk.commands.content_graph.objects.script import Script
 from demisto_sdk.commands.pre_commit.hooks.docker import DockerHook
 from demisto_sdk.commands.pre_commit.hooks.hook import Hook, join_files
 from demisto_sdk.commands.pre_commit.hooks.mypy import MypyHook
@@ -547,6 +551,7 @@ def group_by_language(
             infra_files.append(file)
 
     language_to_files: Dict[str, Set] = defaultdict(set)
+    graph = None
     with multiprocessing.Pool() as pool:
         integrations_scripts = pool.map(
             BaseContent.from_path, integrations_scripts_mapping.keys()
@@ -572,9 +577,40 @@ def group_by_language(
             continue
 
         code_file_path = integration_script.path.parent
+
         if python_version := integration_script.python_version:
             version = Version(python_version)
             language = f"{version.major}.{version.minor}"
+            # handle api modules
+            if (
+                integration_script.in_pack
+                and integration_script.in_pack.object_id == API_MODULES_PACK
+            ):
+                if not graph:
+                    graph = ContentGraphInterface()
+                    update_content_graph(graph)
+                graph_obj = graph.search(object_id=integration_script.object_id)[0]
+                assert isinstance(graph_obj, Script)
+                for obj in graph_obj.imported_by:
+                    language_to_files[language].update(
+                        {
+                            (
+                                path,
+                                obj,
+                            )  # Adding the path of the api modules to the imported_by object!
+                            for path in integrations_scripts_mapping[code_file_path]
+                        },
+                        {
+                            (
+                                integration_script.path.relative_to(CONTENT_PATH),
+                                integration_script,
+                            )
+                        },
+                    )
+
+                # no need to add the api modules without their
+                continue
+
         else:
             language = integration_script.type
         language_to_files[language].update(
