@@ -544,7 +544,11 @@ def handle_api_modules(
                         obj,
                     )  # Adding the path of the api modules to the imported_by object!
                     for path in integrations_scripts_mapping[obj.path.parent]
-                }
+                },
+                {
+                    (obj.path.with_suffix(".py"), obj),
+                    (obj.path.with_suffix("_test.py"), obj),
+                },
             )
 
 
