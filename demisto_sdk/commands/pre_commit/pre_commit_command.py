@@ -527,29 +527,30 @@ def handle_api_modules(
         language_to_files (Dict[str, Set]): The dictionary to add the api modules to.
         integrations_scripts_mapping (Dict[Path, Set[Path]]): The mapping between the integration scripts and the paths to check.
     """
-    if "ApiModule" in integration_script.object_id:
-        if not graph:
-            graph = ContentGraphInterface()
-            update_content_graph(graph)
-        graph_obj = graph.search(object_id=integration_script.object_id)[0]
-        assert isinstance(graph_obj, Script)
-        for obj in graph_obj.imported_by:
-            # we can be sure this is a python integration
-            version = Version(obj.python_version)
-            language = f"{version.major}.{version.minor}"
-            language_to_files[language].update(
-                {
-                    (
-                        path,
-                        obj,
-                    )  # Adding the path of the api modules to the imported_by object!
-                    for path in integrations_scripts_mapping[obj.path.parent]
-                },
-                {
-                    (obj.path.with_suffix(".py"), obj),
-                    (obj.path.with_suffix("_test.py"), obj),
-                },
-            )
+    if not graph:
+        graph = ContentGraphInterface()
+        update_content_graph(graph)
+    graph_obj = graph.search(object_id=integration_script.object_id)[0]
+    assert isinstance(graph_obj, Script)
+    for obj in graph_obj.imported_by:
+        if obj.deprecated:
+            continue
+        # we can be sure this is a python integration
+        version = Version(obj.python_version)
+        language = f"{version.major}.{version.minor}"
+        language_to_files[language].update(
+            {
+                (
+                    path,
+                    obj,
+                )  # Adding the path of the api modules to the imported_by object!
+                for path in integrations_scripts_mapping[obj.path.parent]
+            },
+            {
+                (obj.path.with_suffix(".py"), obj),
+                (obj.path.with_suffix("_test.py"), obj),
+            },
+        )
 
 
 def group_by_language(
@@ -623,14 +624,16 @@ def group_by_language(
             version = Version(python_version)
             language = f"{version.major}.{version.minor}"
             # handle api modules
-            handle_api_modules(
-                graph,
-                integration_script,
-                language_to_files,
-                integrations_scripts_mapping,
-            )
-            # no need to add the api modules for their own
-            continue
+            if "ApiModule" in integration_script.object_id:
+
+                handle_api_modules(
+                    graph,
+                    integration_script,
+                    language_to_files,
+                    integrations_scripts_mapping,
+                )
+                # no need to add the api modules for their own
+                continue
 
         else:
             language = integration_script.type
