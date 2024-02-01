@@ -160,13 +160,15 @@ def lock_integrations(test_playbook, storage_client: storage.Client) -> bool:
                 "Integration lock file in not exists, continue running"
             )
             continue
-
+        test_playbook.build_context.logging_module.warning(
+            f"\n\n{lock_expired(lock_file, lock_timeout)=}, {workflow_still_running(workflow_id, test_playbook)=}\n\n"
+        )
         if not lock_expired(lock_file, lock_timeout) and workflow_still_running(
             workflow_id, test_playbook
         ):
             # there is a locked integration for which the lock is not expired - test cannot be executed at the moment
             test_playbook.build_context.logging_module.warning(
-                f"Could not lock integration {integration}, another lock file was exist with "
+                f"test Could not lock integration {integration}, another lock file was exist with "
                 f"build number: {build_number}, timeout: {lock_timeout}, last update at {lock_file.updated}.\n"
                 f"Delaying test execution"
             )
