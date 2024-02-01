@@ -123,6 +123,9 @@ def workflow_still_running(workflow_id: str, test_playbook) -> bool:
                 f"Failed to get gitlab-ci response about pipeline with id {workflow_id}."
             )
             return True
+        test_playbook.build_context.logging_module.debug(
+            f"{workflow_details_response.json().get('status')=}"
+        )
         return workflow_details_response.json().get("status") not in (
             "canceled",
             "success",
