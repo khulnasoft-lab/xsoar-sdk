@@ -171,7 +171,7 @@ def lock_integrations(test_playbook, storage_client: storage.Client) -> bool:
         ):
             # there is a locked integration for which the lock is not expired - test cannot be executed at the moment
             test_playbook.build_context.logging_module.warning(
-                f"test Could not lock integration {integration}, another lock file was exist with "
+                f"test1 Could not lock integration {integration}, another lock file was exist with "
                 f"build number: {build_number}, timeout: {lock_timeout}, last update at {lock_file.updated}.\n"
                 f"Delaying test execution"
             )
