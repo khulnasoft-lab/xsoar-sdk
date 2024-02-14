@@ -2952,6 +2952,7 @@ class ServerContext:
             auth_id=self.build_context.auth_id,
             verify_ssl=False,
         )
+        logging.info(f"{self.server_url=}, {self.build_context.api_key=}, {self.build_context.auth_id}")
 
     def reset_containers(self):
         if self.build_context.is_saas_server_type:
