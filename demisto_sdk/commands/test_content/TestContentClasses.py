@@ -2948,7 +2948,7 @@ class ServerContext:
             del self.client
         self.client = demisto_client.configure(
             base_url=self.server_url,
-            api_key=self.build_context.api_key,
+            api_key=os.getenv("DEMISTO_API_KEY_8"),
             auth_id=self.build_context.auth_id,
             verify_ssl=False,
         )
