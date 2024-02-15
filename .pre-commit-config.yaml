@@ -34,7 +34,7 @@ repos:
     additional_dependencies:
     - astroid==2.9.3 ; python_version >= "3.8" and python_version < "3.11"
     - attrs==23.2.0 ; python_version >= "3.8" and python_version < "3.11"
-    - autopep8==1.7.0 ; python_version >= "3.8" and python_version < "3.11"
+    - autopep8==2.0.4 ; python_version >= "3.8" and python_version < "3.11"
     - backports-zoneinfo==0.2.1 ; python_version >= "3.8" and python_version < "3.9"
     - bandit==1.7.7 ; python_version >= "3.8" and python_version < "3.11"
     - beautifulsoup4==4.12.3 ; python_version >= "3.8" and python_version < "3.11"
