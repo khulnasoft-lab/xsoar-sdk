@@ -523,13 +523,13 @@ files = [
 
 [[package]]
 name = "certifi"
-version = "2023.7.22"
+version = "2024.2.2"
 description = "Python package for providing Mozilla's CA Bundle."
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "certifi-2023.7.22-py3-none-any.whl", hash = "sha256:92d6037539857d8206b8f6ae472e8b77db8058fec5937a1ef3f54304089edbb9"},
-    {file = "certifi-2023.7.22.tar.gz", hash = "sha256:539cc1d13202e33ca466e88b2807e29f4c13049d6d87031a3c110744495cb082"},
+    {file = "certifi-2024.2.2-py3-none-any.whl", hash = "sha256:dc383c07b76109f368f6106eee2b593b04a011ea4d55f652c6ca24a754d1cdd1"},
+    {file = "certifi-2024.2.2.tar.gz", hash = "sha256:0569859f95fc761b18b45ef421b1290a0f65f147e92a1e5eb3e635f9a5e4e66f"},
 ]
 
 [[package]]
@@ -997,22 +997,21 @@ files = [
 
 [[package]]
 name = "demisto-py"
-version = "3.2.10"
-description = "A Python library for the Demisto API"
+version = "3.2.14"
+description = "\"A Python library for the Demisto API\""
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.8,<=3.12"
 files = [
-    {file = "demisto-py-3.2.10.tar.gz", hash = "sha256:ae3ee25afe2fabee1e6120aafbb84615aa583ebe407b54ff10f2747bbdcc6514"},
-    {file = "demisto_py-3.2.10-py3-none-any.whl", hash = "sha256:70bd630374fc2c238e5aed1bedebdd8e8105161a62b696fd327ff2ed8893dca3"},
+    {file = "demisto_py-3.2.14-py3-none-any.whl", hash = "sha256:aa6bf1fa3ff93f30de53f0a145840c50bd25cd9b471dc93257c2603862047e0a"},
+    {file = "demisto_py-3.2.14.tar.gz", hash = "sha256:4d6af4e89b5232bffe7f0a48bd3c187ef58f9f494af049c2dbd27e10fccc3f62"},
 ]
 
 [package.dependencies]
-certifi = ">=2017.4.17"
-python-dateutil = ">=2.5.3"
-setuptools = ">=21.0.0"
-six = ">=1.10"
-tzlocal = "==4.*"
-urllib3 = ">=1.26.7"
+certifi = ">=2024.2.2,<2025.0.0"
+python-dateutil = ">=2.7.2,<3.0.0"
+six = ">=1.16,<2.0"
+tzlocal = ">=5.2.0,<6.0.0"
+urllib3 = "<2.1.0"
 
 [[package]]
 name = "deprecated"
@@ -3737,21 +3736,6 @@ files = [
 ]
 
 [[package]]
-name = "pytz-deprecation-shim"
-version = "0.1.0.post0"
-description = "Shims to make deprecation of pytz easier"
-optional = false
-python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
-files = [
-    {file = "pytz_deprecation_shim-0.1.0.post0-py2.py3-none-any.whl", hash = "sha256:8314c9692a636c8eb3bda879b9f119e350e93223ae83e70e80c31675a0fdc1a6"},
-    {file = "pytz_deprecation_shim-0.1.0.post0.tar.gz", hash = "sha256:af097bae1b616dde5c5744441e2ddc69e74dfdcb0c263129610d85b87445a59d"},
-]
-
-[package.dependencies]
-"backports.zoneinfo" = {version = "*", markers = "python_version >= \"3.6\" and python_version < \"3.9\""}
-tzdata = {version = "*", markers = "python_version >= \"3.6\""}
-
-[[package]]
 name = "pyu2f"
 version = "0.1.5"
 description = "U2F host library for interacting with a U2F device over USB."
@@ -4792,22 +4776,21 @@ files = [
 
 [[package]]
 name = "tzlocal"
-version = "4.3"
+version = "5.2"
 description = "tzinfo object for the local timezone"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "tzlocal-4.3-py3-none-any.whl", hash = "sha256:b44c4388f3d34f25862cfbb387578a4d70fec417649da694a132f628a23367e2"},
-    {file = "tzlocal-4.3.tar.gz", hash = "sha256:3f21d09e1b2aa9f2dacca12da240ca37de3ba5237a93addfd6d593afe9073355"},
+    {file = "tzlocal-5.2-py3-none-any.whl", hash = "sha256:49816ef2fe65ea8ac19d19aa7a1ae0551c834303d5014c6d5a62e4cbda8047b8"},
+    {file = "tzlocal-5.2.tar.gz", hash = "sha256:8d399205578f1a9342816409cc1e46a93ebd5755e39ea2d85334bea911bf0e6e"},
 ]
 
 [package.dependencies]
 "backports.zoneinfo" = {version = "*", markers = "python_version < \"3.9\""}
-pytz-deprecation-shim = "*"
 tzdata = {version = "*", markers = "platform_system == \"Windows\""}
 
 [package.extras]
-devenv = ["black", "check-manifest", "flake8", "pyroma", "pytest (>=4.3)", "pytest-cov", "pytest-mock (>=3.3)", "zest.releaser"]
+devenv = ["check-manifest", "pytest (>=4.3)", "pytest-cov", "pytest-mock (>=3.3)", "zest.releaser"]
 
 [[package]]
 name = "ujson"
